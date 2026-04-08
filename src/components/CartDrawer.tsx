@@ -1,5 +1,9 @@
-import { X, Minus, Plus, ShoppingCart } from "lucide-react";
+import { X, Minus, Plus, ShoppingCart, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { Product } from "./ProductCard";
 
 export interface CartItem {
@@ -13,10 +17,77 @@ interface CartDrawerProps {
   items: CartItem[];
   onUpdateQuantity: (productId: string, delta: number) => void;
   onRemove: (productId: string) => void;
+  onClearCart: () => void;
 }
 
-const CartDrawer = ({ open, onClose, items, onUpdateQuantity, onRemove }: CartDrawerProps) => {
+const CartDrawer = ({ open, onClose, items, onUpdateQuantity, onRemove, onClearCart }: CartDrawerProps) => {
+  const [phone, setPhone] = useState("");
+  const [paying, setPaying] = useState(false);
+  const { toast } = useToast();
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+  const handlePayment = async () => {
+    if (!phone || phone.length < 9) {
+      toast({ title: "Enter a valid phone number", variant: "destructive" });
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({ title: "Please sign in first", description: "You need an account to place orders.", variant: "destructive" });
+      return;
+    }
+
+    setPaying(true);
+
+    try {
+      // Create order
+      const { data: order, error: orderErr } = await supabase
+        .from("orders")
+        .insert({ user_id: user.id, total, phone_number: phone })
+        .select()
+        .single();
+
+      if (orderErr || !order) throw new Error(orderErr?.message || "Failed to create order");
+
+      // Create order items
+      const orderItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: item.product.id,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+      }));
+
+      const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
+      if (itemsErr) throw new Error(itemsErr.message);
+
+      // Trigger M-Pesa STK Push
+      const { data: stkData, error: stkErr } = await supabase.functions.invoke("mpesa-stk-push", {
+        body: { phone, amount: total, orderId: order.id },
+      });
+
+      if (stkErr) throw new Error(stkErr.message);
+
+      if (stkData?.ResponseCode === "0") {
+        toast({
+          title: "M-Pesa prompt sent!",
+          description: `Check your phone (${phone}) to complete payment.`,
+        });
+        onClearCart();
+        onClose();
+      } else {
+        toast({
+          title: "STK Push failed",
+          description: stkData?.ResponseDescription || "Try again",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Payment error", description: err.message, variant: "destructive" });
+    } finally {
+      setPaying(false);
+    }
+  };
 
   return (
     <>
@@ -75,8 +146,17 @@ const CartDrawer = ({ open, onClose, items, onUpdateQuantity, onRemove }: CartDr
                 <span className="text-muted-foreground">Total</span>
                 <span className="text-xl font-bold text-primary font-mono">KSh {total}</span>
               </div>
-              <Button variant="glow" className="w-full" size="lg">
-                Pay with M-Pesa
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="M-Pesa phone (0712345678)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="pl-10 bg-secondary/50 border-border"
+                />
+              </div>
+              <Button variant="glow" className="w-full" size="lg" onClick={handlePayment} disabled={paying}>
+                {paying ? "Sending STK Push..." : "Pay with M-Pesa"}
               </Button>
             </div>
           )}
