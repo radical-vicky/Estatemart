@@ -35,6 +35,10 @@ const Index = () => {
     setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
   }, []);
 
+  const handleClearCart = useCallback(() => {
+    setCartItems([]);
+  }, []);
+
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -50,6 +54,7 @@ const Index = () => {
         items={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onRemove={handleRemove}
+        onClearCart={handleClearCart}
       />
     </div>
   );

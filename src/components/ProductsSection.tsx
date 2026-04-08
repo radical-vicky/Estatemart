@@ -1,22 +1,43 @@
-import ProductCard, { Product } from "./ProductCard";
+import { useState, useEffect } from "react";
+import ProductCard from "./ProductCard";
 import { ShoppingBag } from "lucide-react";
-
-const PRODUCTS: Product[] = [
-  { id: "1", name: "Fresh Avocados", price: 150, category: "Groceries", vendor: "Green Basket", image: "https://images.unsplash.com/photo-1523049673857-eb18f1d85f27?w=400&h=400&fit=crop", inStock: true },
-  { id: "2", name: "Whole Milk 1L", price: 85, category: "Dairy", vendor: "Estate Dairy", image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop", inStock: true },
-  { id: "3", name: "Brown Bread", price: 60, category: "Bakery", vendor: "Daily Bakes", image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop", inStock: true },
-  { id: "4", name: "Free Range Eggs (Tray)", price: 450, category: "Groceries", vendor: "Green Basket", image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400&h=400&fit=crop", inStock: true },
-  { id: "5", name: "Cooking Oil 2L", price: 380, category: "Essentials", vendor: "Quick Mart", image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&h=400&fit=crop", inStock: false },
-  { id: "6", name: "Tomatoes 1kg", price: 120, category: "Groceries", vendor: "Green Basket", image: "https://images.unsplash.com/photo-1546470427-0d4db154ceb8?w=400&h=400&fit=crop", inStock: true },
-  { id: "7", name: "Chicken Breast 500g", price: 550, category: "Meat", vendor: "Estate Butchery", image: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400&h=400&fit=crop", inStock: true },
-  { id: "8", name: "Sukuma Wiki Bundle", price: 30, category: "Groceries", vendor: "Green Basket", image: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&h=400&fit=crop", inStock: true },
-];
+import { supabase } from "@/integrations/supabase/client";
+import type { Product } from "./ProductCard";
 
 interface ProductsSectionProps {
   onAddToCart: (product: Product) => void;
 }
 
 const ProductsSection = ({ onAddToCart }: ProductsSectionProps) => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setProducts(
+          data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            category: p.category,
+            vendor: p.vendor_name,
+            image: p.image_url || "https://images.unsplash.com/photo-1523049673857-eb18f1d85f27?w=400&h=400&fit=crop",
+            inStock: p.in_stock,
+          }))
+        );
+      }
+      setLoading(false);
+    };
+
+    fetchProducts();
+  }, []);
+
   return (
     <section id="products" className="py-20">
       <div className="container mx-auto px-4">
@@ -27,11 +48,20 @@ const ProductsSection = ({ onAddToCart }: ProductsSectionProps) => {
         <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Fresh from your estate</h2>
         <p className="text-muted-foreground mb-10 max-w-lg">Browse products from verified vendors right in your neighborhood.</p>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} onAddToCart={onAddToCart} />
-          ))}
-        </div>
+        {loading ? (
+          <p className="text-muted-foreground">Loading products...</p>
+        ) : products.length === 0 ? (
+          <div className="glass rounded-xl p-12 text-center">
+            <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-30" />
+            <p className="text-muted-foreground">No products yet. Vendors can add products from the Vendor Dashboard.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} onAddToCart={onAddToCart} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
