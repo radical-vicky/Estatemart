@@ -1,4 +1,4 @@
-import { ShoppingCart, Menu, X, User, LogOut } from "lucide-react";
+import { ShoppingCart, Menu, X, LogOut, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -46,6 +46,11 @@ const Navbar = ({ cartCount, onCartClick }: NavbarProps) => {
           <a href="#products" className="text-sm text-muted-foreground hover:text-primary transition-colors">Products</a>
           <a href="#categories" className="text-sm text-muted-foreground hover:text-primary transition-colors">Categories</a>
           <Link to="/vendor" className="text-sm text-muted-foreground hover:text-primary transition-colors">Vendor Dashboard</Link>
+          {user && (
+            <Link to="/orders" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+              <ClipboardList className="w-3.5 h-3.5" /> Orders
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -80,6 +85,9 @@ const Navbar = ({ cartCount, onCartClick }: NavbarProps) => {
           <a href="#products" className="block text-sm text-muted-foreground hover:text-primary">Products</a>
           <a href="#categories" className="block text-sm text-muted-foreground hover:text-primary">Categories</a>
           <Link to="/vendor" className="block text-sm text-muted-foreground hover:text-primary">Vendor Dashboard</Link>
+          {user && (
+            <Link to="/orders" className="block text-sm text-muted-foreground hover:text-primary">Order History</Link>
+          )}
           {user ? (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-mono">{user.email}</span>
