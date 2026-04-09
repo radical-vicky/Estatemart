@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
 
     const shortcode = Deno.env.get("MPESA_SHORTCODE") || "174379";
     const passkey = Deno.env.get("MPESA_PASSKEY")!;
-    const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL") || "https://galaxystore1.onrender.com/mpesa/callback/";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL") || `${supabaseUrl}/functions/v1/mpesa-callback`;
 
     const timestamp = new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
     const password = btoa(`${shortcode}${passkey}${timestamp}`);
