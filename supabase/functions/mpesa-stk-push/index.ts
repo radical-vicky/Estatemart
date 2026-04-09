@@ -42,8 +42,6 @@ Deno.serve(async (req) => {
     const passkey = Deno.env.get("MPESA_PASSKEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL") || `${supabaseUrl}/functions/v1/mpesa-callback`;
-    console.log("Using callback URL:", callbackUrl);
-    console.log("Using shortcode:", shortcode);
 
     const timestamp = new Date().toISOString().replace(/[-T:\.Z]/g, "").slice(0, 14);
     const password = btoa(`${shortcode}${passkey}${timestamp}`);
