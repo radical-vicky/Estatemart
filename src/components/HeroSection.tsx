@@ -1,8 +1,34 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Truck, Shield, Zap } from "lucide-react";
 import heroBg from "@/assets/hero-bg.jpg";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleStartShopping = () => {
+    const productsSection = document.getElementById("products");
+    if (productsSection) {
+      productsSection.scrollIntoView({ behavior: "smooth" });
+    } else {
+      navigate("/");
+      toast({
+        title: "Coming Soon",
+        description: "Products section is being loaded.",
+      });
+    }
+  };
+
+  const handleBecomeVendor = () => {
+    navigate("/vendor");
+    toast({
+      title: "Vendor Program",
+      description: "Learn how to become a vendor on EstateMart.",
+    });
+  };
+
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       <div
@@ -15,14 +41,16 @@ const HeroSection = () => {
       <div className="container mx-auto px-4 relative z-10 pt-20 pb-12">
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 mb-6">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse-green" />
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span className="text-xs font-mono text-muted-foreground">Now serving your estate</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold leading-[1.1] mb-6 tracking-tight">
             <span className="text-foreground">Your estate,</span>
             <br />
-            <span className="text-gradient-green">delivered.</span>
+            <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              delivered.
+            </span>
           </h1>
 
           <p className="text-base sm:text-lg text-muted-foreground max-w-xl mb-8 leading-relaxed">
@@ -30,10 +58,20 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mb-12">
-            <Button variant="glow" size="lg" className="gap-2 text-base h-12 px-8 rounded-xl">
+            <Button 
+              variant="glow" 
+              size="lg" 
+              className="gap-2 text-base h-12 px-8 rounded-xl"
+              onClick={handleStartShopping}
+            >
               Start Shopping <ArrowRight className="w-4 h-4" />
             </Button>
-            <Button variant="glass" size="lg" className="text-base h-12 px-8 rounded-xl">
+            <Button 
+              variant="glass" 
+              size="lg" 
+              className="text-base h-12 px-8 rounded-xl"
+              onClick={handleBecomeVendor}
+            >
               Become a Vendor
             </Button>
           </div>
