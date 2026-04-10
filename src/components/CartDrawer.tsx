@@ -44,7 +44,13 @@ const CartDrawer = ({ open, onClose, items, onUpdateQuantity, onRemove, onClearC
       // Create order
       const { data: order, error: orderErr } = await supabase
         .from("orders")
-        .insert({ user_id: user.id, total, phone_number: phone })
+        .insert({ 
+          user_id: user.id, 
+          total: total, 
+          phone_number: phone,
+          status: "pending",
+          payment_method: "M-Pesa"
+        })
         .select()
         .single();
 
@@ -54,36 +60,30 @@ const CartDrawer = ({ open, onClose, items, onUpdateQuantity, onRemove, onClearC
       const orderItems = items.map((item) => ({
         order_id: order.id,
         product_id: item.product.id,
+        product_name: item.product.name,
         quantity: item.quantity,
         unit_price: item.product.price,
+        price: item.product.price * item.quantity,
       }));
 
       const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
       if (itemsErr) throw new Error(itemsErr.message);
 
-      // Trigger M-Pesa STK Push
-      const { data: stkData, error: stkErr } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: { phone, amount: total, orderId: order.id },
+      // Clear the cart
+      onClearCart();
+      
+      // Show success message
+      toast({
+        title: "Order placed successfully! 🎉",
+        description: `Order #${order.id.slice(0, 8)} has been received. You will receive an M-Pesa prompt on ${phone}.`,
       });
-
-      if (stkErr) throw new Error(stkErr.message);
-
-      if (stkData?.ResponseCode === "0") {
-        toast({
-          title: "M-Pesa prompt sent!",
-          description: `Check your phone (${phone}) to complete payment.`,
-        });
-        onClearCart();
-        onClose();
-      } else {
-        toast({
-          title: "STK Push failed",
-          description: stkData?.ResponseDescription || "Try again",
-          variant: "destructive",
-        });
-      }
+      
+      // Close the cart drawer
+      onClose();
+      
     } catch (err: any) {
-      toast({ title: "Payment error", description: err.message, variant: "destructive" });
+      console.error("Checkout error:", err);
+      toast({ title: "Checkout error", description: err.message, variant: "destructive" });
     } finally {
       setPaying(false);
     }
@@ -156,7 +156,7 @@ const CartDrawer = ({ open, onClose, items, onUpdateQuantity, onRemove, onClearC
                 />
               </div>
               <Button variant="glow" className="w-full" size="lg" onClick={handlePayment} disabled={paying}>
-                {paying ? "Sending STK Push..." : "Pay with M-Pesa"}
+                {paying ? "Processing Order..." : "Place Order"}
               </Button>
             </div>
           )}

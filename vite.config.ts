@@ -11,6 +11,11 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // Add this section to allow your ngrok domain
+    allowedHosts: [
+      "pamella-gypseous-anne.ngrok-free.dev", // Your specific ngrok domain
+      ".ngrok-free.dev", // Allow all ngrok-free.dev subdomains
+    ],
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
