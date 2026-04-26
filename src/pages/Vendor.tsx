@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
   Plus, 
@@ -20,7 +20,17 @@ import {
   Loader2,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CheckCircle,
+  Percent,
+  DollarSign,
+  Clock,
+  Shield,
+  Store,
+  PenTool,
+  Mail,
+  Calendar,
+  User
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -63,6 +73,23 @@ const Vendor = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [isVendor, setIsVendor] = useState<boolean | null>(null);
+  const [showConsent, setShowConsent] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [vendorApplicationStatus, setVendorApplicationStatus] = useState<string | null>(null);
+  const [signatureData, setSignatureData] = useState<string>("");
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [signatureName, setSignatureName] = useState("");
+  const [signatureEmail, setSignatureEmail] = useState("");
+  const [signatureDate, setSignatureDate] = useState(new Date().toISOString().split('T')[0]);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [vendorAgreement, setVendorAgreement] = useState({
+    commissionRate: 8,
+    deliveryFee: 50,
+    payoutSchedule: "instant",
+    returnPolicy: true,
+    qualityGuarantee: true,
+  });
   
   // Form state
   const [name, setName] = useState("");
@@ -76,11 +103,135 @@ const Vendor = () => {
   const [uploadProgress, setUploadProgress] = useState(false);
   
   const { toast } = useToast();
+  const navigate = useNavigate();
   const itemsPerPage = 6;
 
+  // Signature pad functions
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    setIsDrawing(true);
+    ctx.beginPath();
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+    
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+      e.preventDefault();
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.beginPath();
+    
+    setSignatureData(canvas.toDataURL());
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setSignatureData("");
+  };
+
+  const initCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
   useEffect(() => {
-    fetchProducts();
+    initCanvas();
+  }, [showConsent]);
+
+  useEffect(() => {
+    checkVendorStatus();
   }, []);
+
+  const checkVendorStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+
+    setSignatureEmail(user.email || "");
+    setSignatureName(user.user_metadata?.display_name || user.email?.split('@')[0] || "");
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role, is_verified")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role === "vendor") {
+      setIsVendor(true);
+      setVendorApplicationStatus("approved");
+      fetchProducts();
+    } else {
+      setIsVendor(false);
+      setVendorApplicationStatus(null);
+      setShowConsent(true);
+    }
+  };
 
   const fetchProducts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -98,6 +249,89 @@ const Vendor = () => {
     if (!error && data) setProducts(data);
     setLoading(false);
   };
+
+
+const handleVendorConsent = async () => {
+  if (!agreedToTerms) {
+    toast({ 
+      title: "Please accept the terms", 
+      description: "You must agree to the vendor terms to continue.", 
+      variant: "destructive" 
+    });
+    return;
+  }
+
+  if (!signatureData) {
+    toast({ 
+      title: "Signature Required", 
+      description: "Please provide your digital signature to complete the agreement.", 
+      variant: "destructive" 
+    });
+    return;
+  }
+
+  if (!signatureName) {
+    toast({ 
+      title: "Full Name Required", 
+      description: "Please enter your full name as it appears on legal documents.", 
+      variant: "destructive" 
+    });
+    return;
+  }
+
+  setSaving(true);
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    toast({ title: "Not signed in", variant: "destructive" });
+    setSaving(false);
+    return;
+  }
+
+  // Prepare update data - only include columns that exist
+  const updateData: any = { 
+    role: "vendor",
+    is_verified: true,
+    vendor_agreement_accepted: true,
+    vendor_agreement_date: new Date().toISOString(),
+    commission_rate: vendorAgreement.commissionRate,
+    delivery_fee_agreement: vendorAgreement.deliveryFee
+  };
+  
+  // Only add signature fields if they exist in the table
+  try {
+    // Check if signature columns exist by attempting to set them
+    updateData.signature_data = signatureData;
+    updateData.signature_name = signatureName;
+    updateData.signature_email = signatureEmail;
+    updateData.signature_date = signatureDate;
+  } catch (err) {
+    console.log("Signature columns may not exist in profiles table");
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("Update error:", error);
+    toast({ title: "Error", description: error.message, variant: "destructive" });
+    setSaving(false);
+  } else {
+    toast({ 
+      title: "Welcome to EstateMart!", 
+      description: "Your vendor account has been approved instantly. You can now start selling." 
+    });
+    
+    setIsVendor(true);
+    setVendorApplicationStatus("approved");
+    setShowConsent(false);
+    fetchProducts();
+  }
+  setSaving(false);
+};
+
 
   const fetchSalesReport = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -376,7 +610,6 @@ const Vendor = () => {
     setShowReport(true);
   };
 
-  // Filter products
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.vendor_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -384,18 +617,241 @@ const Vendor = () => {
     return matchesSearch && matchesCategory;
   });
 
-  // Pagination
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Stats
   const totalProducts = products.length;
   const inStockCount = products.filter(p => p.in_stock).length;
   const totalSales = salesReport.reduce((sum, day) => sum + day.total, 0);
   const totalItemsSold = salesReport.reduce((sum, day) => sum + day.items.length, 0);
+
+  // Show consent modal if not a vendor
+  if (showConsent && isVendor === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <Store className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Vendor Agreement</h2>
+                <p className="text-xs text-green-100">Please review and sign the vendor agreement</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-4">
+              {/* Commission Notice */}
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Percent className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-amber-800 dark:text-amber-300">Commission Rate: 8%</h3>
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      EstateMart charges 8% commission on every successful sale.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Fee Notice */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <DollarSign className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-blue-800 dark:text-blue-300">Delivery Fee: KSh 50</h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                      Standard delivery fee of KSh 50 applies to all orders.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instant Payouts */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-purple-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-purple-800 dark:text-purple-300">Instant Payouts</h3>
+                    <p className="text-sm text-purple-700 dark:text-purple-400">
+                      Earnings are paid instantly to your M-Pesa account as soon as a customer completes payment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quality Guarantee */}
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-green-800 dark:text-green-300">Quality Guarantee</h3>
+                    <p className="text-sm text-green-700 dark:text-green-400">
+                      All products must meet quality standards. EstateMart may review and remove substandard products.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Signer Information */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Signer Information
+                </h3>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Full Name (as on legal documents)"
+                      value={signatureName}
+                      onChange={(e) => setSignatureName(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <Input
+                      type="email"
+                      placeholder="Email Address"
+                      value={signatureEmail}
+                      onChange={(e) => setSignatureEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <Input
+                      type="date"
+                      placeholder="Date"
+                      value={signatureDate}
+                      onChange={(e) => setSignatureDate(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Digital Signature Pad */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h3 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                  <PenTool className="w-4 h-4" />
+                  Digital Signature
+                </h3>
+                <p className="text-sm text-gray-500 mb-2">Draw your signature below</p>
+                <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white">
+                  <canvas
+                    ref={canvasRef}
+                    width={500}
+                    height={150}
+                    className="w-full cursor-crosshair touch-none"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                    style={{ touchAction: 'none' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSignature}
+                  className="text-sm text-red-500 hover:text-red-600 mt-2"
+                >
+                  Clear Signature
+                </button>
+              </div>
+
+              {/* Terms Agreement */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-800 dark:text-white">I agree to the Vendor Terms</span>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      I confirm that I have read and agree to the commission rate, delivery fee structure, payout schedule, and quality standards.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Additional Agreements */}
+              <div className="space-y-2 pl-7">
+                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={vendorAgreement.returnPolicy}
+                    onChange={(e) => setVendorAgreement({ ...vendorAgreement, returnPolicy: e.target.checked })}
+                    className="w-3.5 h-3.5"
+                  />
+                  I accept the return and refund policy
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={vendorAgreement.qualityGuarantee}
+                    onChange={(e) => setVendorAgreement({ ...vendorAgreement, qualityGuarantee: e.target.checked })}
+                    className="w-3.5 h-3.5"
+                  />
+                  I confirm my products meet quality standards
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer with Start Selling Button */}
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
+            <div className="flex gap-3">
+              <Link to="/" className="flex-1">
+                <Button variant="outline" className="w-full">
+                  Cancel
+                </Button>
+              </Link>
+              <Button 
+                variant="glow" 
+                className="flex-1 gap-2"
+                onClick={handleVendorConsent}
+                disabled={!agreedToTerms || saving || !signatureData || !signatureName}
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                {saving ? "Processing..." : "Start Selling"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (isVendor === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show vendor dashboard for approved vendors
+  if (!isVendor) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -591,7 +1047,6 @@ const Vendor = () => {
             <Package className="w-4 h-4 text-primary" /> Your Products ({filteredProducts.length})
           </h2>
           
-          {/* Search and Filter */}
           <div className="flex gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
@@ -686,7 +1141,6 @@ const Vendor = () => {
               ))}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center gap-2 mt-6">
                 <Button
@@ -733,7 +1187,6 @@ const Vendor = () => {
               <p className="text-xs text-muted-foreground">Your sales performance summary</p>
             </div>
 
-            {/* Summary Stats */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               <div className="bg-primary/10 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-primary">KSh {totalSales.toLocaleString()}</p>

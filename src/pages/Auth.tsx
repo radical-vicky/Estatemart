@@ -17,7 +17,6 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if user is already logged in
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -34,7 +33,6 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        // Login
         const { error } = await supabase.auth.signInWithPassword({ 
           email, 
           password 
@@ -48,7 +46,7 @@ const Auth = () => {
         });
         navigate("/");
       } else {
-        // Signup
+        // Sign up - profile will be auto-created by database trigger
         const { error, data } = await supabase.auth.signUp({
           email,
           password,
@@ -63,30 +61,18 @@ const Auth = () => {
         if (error) throw error;
         
         if (data.user) {
-          // Create profile entry
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert({
-              id: data.user.id,
-              user_id: data.user.id,
-              display_name: displayName || email.split('@')[0],
-              email: email,
-              role: role,
-            });
+          toast({ 
+            title: "Account created!", 
+            description: "Please check your email to confirm your account. You can now sign in.",
+            duration: 5000,
+          });
           
-          if (profileError) {
-            console.error("Profile creation error:", profileError);
-          }
+          // Clear form and switch to login
+          setEmail("");
+          setPassword("");
+          setDisplayName("");
+          setIsLogin(true);
         }
-        
-        toast({ 
-          title: "Account created!", 
-          description: "Please check your email to confirm your account." 
-        });
-        
-        // Switch to login mode
-        setIsLogin(true);
-        setPassword("");
       }
     } catch (err: any) {
       console.error("Auth error:", err);
@@ -250,7 +236,10 @@ const Auth = () => {
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setPassword("");
+              }}
               className="text-green-600 hover:underline font-medium"
             >
               {isLogin ? "Sign up" : "Sign in"}
