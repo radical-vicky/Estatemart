@@ -6,12 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
+export interface Database {
   public: {
     Tables: {
       order_items: {
@@ -20,24 +15,36 @@ export type Database = {
           id: string
           order_id: string
           product_id: string
+          product_name: string | null
           quantity: number
           unit_price: number
+          price: number | null
+          vendor_id: string | null
+          vendor_name: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           order_id: string
           product_id: string
+          product_name?: string | null
           quantity: number
           unit_price: number
+          price?: number | null
+          vendor_id?: string | null
+          vendor_name?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           order_id?: string
           product_id?: string
+          product_name?: string | null
           quantity?: number
           unit_price?: number
+          price?: number | null
+          vendor_id?: string | null
+          vendor_name?: string | null
         }
         Relationships: [
           {
@@ -53,7 +60,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       orders: {
@@ -67,6 +74,8 @@ export type Database = {
           total: number
           updated_at: string
           user_id: string
+          vendor_id: string | null
+          vendor_name: string | null
         }
         Insert: {
           created_at?: string
@@ -78,6 +87,8 @@ export type Database = {
           total: number
           updated_at?: string
           user_id: string
+          vendor_id?: string | null
+          vendor_name?: string | null
         }
         Update: {
           created_at?: string
@@ -89,6 +100,8 @@ export type Database = {
           total?: number
           updated_at?: string
           user_id?: string
+          vendor_id?: string | null
+          vendor_name?: string | null
         }
         Relationships: []
       }
@@ -105,6 +118,7 @@ export type Database = {
           price: number
           updated_at: string
           vendor_name: string
+          vendor_id: string | null
         }
         Insert: {
           category?: string
@@ -118,6 +132,7 @@ export type Database = {
           price: number
           updated_at?: string
           vendor_name?: string
+          vendor_id?: string | null
         }
         Update: {
           category?: string
@@ -131,6 +146,7 @@ export type Database = {
           price?: number
           updated_at?: string
           vendor_name?: string
+          vendor_id?: string | null
         }
         Relationships: []
       }
@@ -138,6 +154,7 @@ export type Database = {
         Row: {
           created_at: string
           display_name: string | null
+          email: string | null
           id: string
           phone_number: string | null
           role: string
@@ -147,6 +164,7 @@ export type Database = {
         Insert: {
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           phone_number?: string | null
           role?: string
@@ -156,6 +174,7 @@ export type Database = {
         Update: {
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           phone_number?: string | null
           role?: string
@@ -180,125 +199,56 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+// Helper types for easier access
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
+export type InsertTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
+export type UpdateTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+// Specific type exports for common use
+export type Product = Tables<'products'>
+export type Order = Tables<'orders'>
+export type OrderItem = Tables<'order_items'>
+export type Profile = Tables<'profiles'>
 
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+// Extended types for frontend use
+export interface ProductWithVendor extends Product {
+  vendor_email?: string
+  vendor_phone?: string
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
 
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+export interface OrderWithItems extends Order {
+  items: OrderItem[]
+  customer_email?: string
+  customer_name?: string
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
 
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+export interface VendorOrderItem extends OrderItem {
+  orders: Order & {
+    user_email?: string
+    user_name?: string
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
 
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+export interface DailySalesReport {
+  date: string
+  total: number
+  items: Array<{
+    id: string
+    product_name: string
+    quantity: number
+    price: number
+    order_id: string
+  }>
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
 
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+export interface CartItemType {
+  product: Product
+  quantity: number
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
 
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const
+export interface VendorGroup {
+  vendorId: string
+  vendorName: string
+  items: CartItemType[]
+  subtotal: number
+}

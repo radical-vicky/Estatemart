@@ -34,7 +34,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Format phone: 2547XXXXXXXX
     let formattedPhone = phone.replace(/\s+/g, "").replace(/^0/, "254").replace(/^\+/, "");
     if (!formattedPhone.startsWith("254")) formattedPhone = "254" + formattedPhone;
 
@@ -75,10 +74,10 @@ Deno.serve(async (req) => {
     const stkData = await stkRes.json();
 
     if (stkData.ResponseCode === "0") {
-      // Update order with checkout request ID
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
 
       await supabase
         .from("orders")
